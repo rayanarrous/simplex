@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Solve Linear Equations using Simplex Method</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #ffe6f0 0%, #ffd6e8 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+        }
+
+        .header h1 {
+            color: #ff4d94;
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(255, 77, 148, 0.2);
+        }
+
+        .header p {
+            color: #666;
+            font-size: 1.1rem;
+        }
+
+        .main-content {
+            display: flex;
+            flex-direction: column;
+            gap: 30px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 4px 15px rgba(255, 77, 148, 0.15);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 6px 20px rgba(255, 77, 148, 0.25);
+        }
+
+        .card h2 {
+            color: #ff4d94;
+            margin-bottom: 20px;
+            font-size: 1.5rem;
+            border-bottom: 2px solid #ffe6f0;
+            padding-bottom: 10px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+            font-weight: 600;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ffe6f0;
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: border-color 0.3s ease;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #ff4d94;
+        }
+
+        .btn {
+            background: #ff4d94;
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 8px rgba(255, 77, 148, 0.3);
+        }
+
+        .btn:hover {
+            background: #ff3380;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(255, 77, 148, 0.4);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            margin-top: 20px;
+        }
+
+        .objective-function {
+            margin-bottom: 25px;
+        }
+
+        .objective-function h3 {
+            color: #ff4d94;
+            margin-bottom: 15px;
+            font-size: 1.2rem;
+        }
+
+        .coefficients-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .coefficient-input {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .coefficient-input input {
+            width: 80px;
+            padding: 10px;
+            border: 2px solid #ffe6f0;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .coefficient-input label {
+            color: #ff4d94;
+            font-weight: 600;
+            min-width: 30px;
+        }
+
+        .constraint {
+            background: #fff5f9;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+            border: 2px solid #ffe6f0;
+        }
+
+        .constraint h4 {
+            color: #ff4d94;
+            margin-bottom: 15px;
+            font-size: 1.1rem;
+        }
+
+        .constraint-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .constraint-row select {
+            padding: 10px;
+            border: 2px solid #ffe6f0;
+            border-radius: 8px;
+            background: white;
+            color: #333;
+            font-size: 1rem;
+        }
+
+        .constraint-row select:focus {
+            outline: none;
+            border-color: #ff4d94;
+        }
+
+        .rhs-input {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .rhs-input input {
+            width: 100px;
+            padding: 10px;
+            border: 2px solid #ffe6f0;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .results {
+            display: none;
+            margin-top: 30px;
+        }
+
+        .results.show {
+            display: block;
+        }
+
+        .results-content {
+            background: #fff5f9;
+            padding: 20px;
+            border-radius: 10px;
+            border: 2px solid #ffe6f0;
+        }
+
+        .results-content h3 {
+            color: #ff4d94;
+            margin-bottom: 15px;
+        }
+
+        .results-content pre {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            overflow-x: auto;
+            border: 1px solid #ffe6f0;
+            font-family: 'Courier New', monospace;
+            line-height: 1.6;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 1.8rem;
+            }
+
+            .card {
+                padding: 20px;
+            }
+
+            .coefficients-grid {
+                justify-content: center;
+            }
+
+            .constraint-row {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .constraint-row select,
+            .constraint-row input {
+                width: 100%;
+            }
+
+            .btn-group {
+                flex-direction: column;
+            }
+
+            .btn {
+                width: 100%;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .header h1 {
+                font-size: 1.5rem;
+            }
+
+            .coefficient-input {
+                flex-direction: column;
+                width: 100%;
+            }
+
+            .coefficient-input input {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Solve Linear Equations using Simplex Method</h1>
+            <p>Enter your linear programming problem data to solve it</p>
+        </div>
+
+        <div class="main-content">
+            <div class="card">
+                <h2>Problem Settings</h2>
+                <div class="form-group">
+                    <label for="numVariables">Number of Variables:</label>
+                    <input type="number" id="numVariables" min="2" max="10" value="2" placeholder="e.g., 2">
+                </div>
+                <div class="form-group">
+                    <label for="numConstraints">Number of Constraints:</label>
+                    <input type="number" id="numConstraints" min="1" max="20" value="2" placeholder="e.g., 2">
+                </div>
+                <div class="form-group">
+                    <label for="problemType">Problem Type:</label>
+                    <select id="problemType" style="width: 100%; padding: 12px; border: 2px solid #ffe6f0; border-radius: 8px; font-size: 1rem;">
+                        <option value="max">Maximize</option>
+                        <option value="min">Minimize</option>
+                    </select>
+                </div>
+                <div class="btn-group">
+                    <button class="btn" onclick="generateModel()">Generate Model</button>
+                </div>
+            </div>
+
+            <div class="card hidden" id="modelCard">
+                <h2>Objective Function</h2>
+                <div class="objective-function">
+                    <h3>Z = <span id="objectiveFunction"></span></h3>
+                    <div class="coefficients-grid" id="objectiveCoefficients"></div>
+                </div>
+
+                <h2 style="margin-top: 30px;">Constraints</h2>
+                <div id="constraintsContainer"></div>
+
+                <div class="btn-group">
+                    <button class="btn" onclick="solveProblem()">Solve</button>
+                    <button class="btn" onclick="resetForm()" style="background: #ff9999;">Reset</button>
+                </div>
+            </div>
+
+            <div class="card results" id="resultsCard">
+                <h2>Results</h2>
+                <div class="results-content" id="resultsContent"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let numVariables = 2;
+        let numConstraints = 2;
+        let problemType = 'max';
+
+        function generateModel() {
+            numVariables = parseInt(document.getElementById('numVariables').value) || 2;
+            numConstraints = parseInt(document.getElementById('numConstraints').value) || 2;
+            problemType = document.getElementById('problemType').value;
+
+            if (numVariables < 2 || numVariables > 10) {
+                alert('Number of variables must be between 2 and 10');
+                return;
+            }
+
+            if (numConstraints < 1 || numConstraints > 20) {
+                alert('Number of constraints must be between 1 and 20');
+                return;
+            }
+
+            // Generate objective function inputs
+            generateObjectiveFunction();
+            
+            // Generate constraints inputs
+            generateConstraints();
+
+            // Show the model card
+            document.getElementById('modelCard').classList.remove('hidden');
+            document.getElementById('resultsCard').classList.remove('show');
+        }
+
+        function generateObjectiveFunction() {
+            const container = document.getElementById('objectiveCoefficients');
+            const functionDisplay = document.getElementById('objectiveFunction');
+            container.innerHTML = '';
+
+            let functionText = '';
+            const variables = ['x', 'y', 'z', 'w', 'v', 'u', 't', 's', 'r', 'q'];
+
+            for (let i = 0; i < numVariables; i++) {
+                const varName = variables[i] || `x${i + 1}`;
+                
+                const inputGroup = document.createElement('div');
+                inputGroup.className = 'coefficient-input';
+                
+                const input = document.createElement('input');
+                input.type = 'number';
+                input.step = 'any';
+                input.id = `obj_${i}`;
+                input.placeholder = '0';
+                input.value = i === 0 ? '1' : '0';
+                
+                const label = document.createElement('label');
+                label.textContent = varName;
+                
+                inputGroup.appendChild(input);
+                inputGroup.appendChild(label);
+                container.appendChild(inputGroup);
+
+                if (i > 0) functionText += ' + ';
+                functionText += `[${varName}] ${varName}`;
+            }
+
+            functionDisplay.textContent = functionText;
+        }
+
+        function generateConstraints() {
+            const container = document.getElementById('constraintsContainer');
+            container.innerHTML = '';
+
+            const variables = ['x', 'y', 'z', 'w', 'v', 'u', 't', 's', 'r', 'q'];
+
+            for (let i = 0; i < numConstraints; i++) {
+                const constraintDiv = document.createElement('div');
+                constraintDiv.className = 'constraint';
+                constraintDiv.id = `constraint_${i}`;
+
+                const title = document.createElement('h4');
+                title.textContent = `Constraint ${i + 1}:`;
+                constraintDiv.appendChild(title);
+
+                const row = document.createElement('div');
+                row.className = 'constraint-row';
+
+                for (let j = 0; j < numVariables; j++) {
+                    const varName = variables[j] || `x${j + 1}`;
+                    
+                    const input = document.createElement('input');
+                    input.type = 'number';
+                    input.step = 'any';
+                    input.id = `const_${i}_${j}`;
+                    input.placeholder = '0';
+                    input.className = 'coefficient-input';
+                    input.style.width = '80px';
+                    
+                    const label = document.createElement('label');
+                    label.textContent = varName;
+                    label.style.marginLeft = '5px';
+                    label.style.marginRight = '5px';
+                    
+                    const wrapper = document.createElement('div');
+                    wrapper.style.display = 'flex';
+                    wrapper.style.alignItems = 'center';
+                    wrapper.style.gap = '5px';
+                    wrapper.appendChild(input);
+                    wrapper.appendChild(label);
+                    
+                    if (j < numVariables - 1) {
+                        const plus = document.createElement('span');
+                        plus.textContent = '+';
+                        plus.style.margin = '0 5px';
+                        plus.style.color = '#ff4d94';
+                        wrapper.appendChild(plus);
+                    }
+                    
+                    row.appendChild(wrapper);
+                }
+
+                const operator = document.createElement('select');
+                operator.id = `operator_${i}`;
+                operator.innerHTML = `
+                    <option value="<=">≤</option>
+                    <option value=">=">≥</option>
+                    <option value="=">=</option>
+                `;
+                row.appendChild(operator);
+
+                const rhsInput = document.createElement('input');
+                rhsInput.type = 'number';
+                rhsInput.step = 'any';
+                rhsInput.id = `rhs_${i}`;
+                rhsInput.placeholder = '0';
+                rhsInput.style.width = '100px';
+                row.appendChild(rhsInput);
+
+                constraintDiv.appendChild(row);
+                container.appendChild(constraintDiv);
+            }
+        }
+
+        function solveProblem() {
+            // Collect objective function coefficients
+            const objectiveCoeffs = [];
+            for (let i = 0; i < numVariables; i++) {
+                const value = parseFloat(document.getElementById(`obj_${i}`).value) || 0;
+                objectiveCoeffs.push(value);
+            }
+
+            // Collect constraints
+            const constraints = [];
+            const variables = ['x', 'y', 'z', 'w', 'v', 'u', 't', 's', 'r', 'q'];
+
+            for (let i = 0; i < numConstraints; i++) {
+                const coeffs = [];
+                for (let j = 0; j < numVariables; j++) {
+                    const value = parseFloat(document.getElementById(`const_${i}_${j}`).value) || 0;
+                    coeffs.push(value);
+                }
+                const operator = document.getElementById(`operator_${i}`).value;
+                const rhs = parseFloat(document.getElementById(`rhs_${i}`).value) || 0;
+
+                constraints.push({
+                    coefficients: coeffs,
+                    operator: operator,
+                    rhs: rhs
+                });
+            }
+
+            // Display results
+            displayResults(objectiveCoeffs, constraints);
+        }
+
+        function displayResults(objectiveCoeffs, constraints) {
+            const resultsContent = document.getElementById('resultsContent');
+            const variables = ['x', 'y', 'z', 'w', 'v', 'u', 't', 's', 'r', 'q'];
+            
+            let resultHTML = '<h3>Entered Problem Data:</h3>';
+            
+            // Display objective function
+            resultHTML += '<p><strong>Objective Function:</strong></p>';
+            let objText = problemType === 'max' ? 'Maximize Z = ' : 'Minimize Z = ';
+            for (let i = 0; i < objectiveCoeffs.length; i++) {
+                if (objectiveCoeffs[i] !== 0) {
+                    if (i > 0 && objectiveCoeffs[i] > 0) objText += ' + ';
+                    if (objectiveCoeffs[i] < 0) objText += ' - ';
+                    if (Math.abs(objectiveCoeffs[i]) !== 1) {
+                        objText += Math.abs(objectiveCoeffs[i]);
+                    }
+                    objText += variables[i] || `x${i + 1}`;
+                }
+            }
+            resultHTML += `<pre>${objText}</pre>`;
+
+            // Display constraints
+            resultHTML += '<p style="margin-top: 20px;"><strong>Constraints:</strong></p><pre>';
+            for (let i = 0; i < constraints.length; i++) {
+                let constraintText = '';
+                for (let j = 0; j < constraints[i].coefficients.length; j++) {
+                    const coeff = constraints[i].coefficients[j];
+                    if (coeff !== 0) {
+                        if (j > 0 && coeff > 0) constraintText += ' + ';
+                        if (coeff < 0) constraintText += ' - ';
+                        if (Math.abs(coeff) !== 1) {
+                            constraintText += Math.abs(coeff);
+                        }
+                        constraintText += variables[j] || `x${j + 1}`;
+                    }
+                }
+                
+                let opSymbol = '';
+                if (constraints[i].operator === '<=') opSymbol = ' ≤ ';
+                else if (constraints[i].operator === '>=') opSymbol = ' ≥ ';
+                else opSymbol = ' = ';
+                
+                constraintText += opSymbol + constraints[i].rhs;
+                resultHTML += constraintText + '\n';
+            }
+            resultHTML += '</pre>';
+
+            resultHTML += '<p style="margin-top: 20px; color: #ff4d94;"><strong>Note:</strong> This is the first phase of the solution. The complete Simplex algorithm will be added later to calculate the optimal solution.</p>';
+
+            resultsContent.innerHTML = resultHTML;
+            document.getElementById('resultsCard').classList.add('show');
+            
+            // Scroll to results
+            document.getElementById('resultsCard').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+
+        function resetForm() {
+            document.getElementById('modelCard').classList.add('hidden');
+            document.getElementById('resultsCard').classList.remove('show');
+            document.getElementById('numVariables').value = 2;
+            document.getElementById('numConstraints').value = 2;
+            document.getElementById('problemType').value = 'max';
+        }
+    </script>
+</body>
+</html>
+
