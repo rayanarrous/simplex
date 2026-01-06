@@ -518,11 +518,14 @@
                 });
             }
 
+            // Solve using Simplex method
+            const solution = simplexSolve(objectiveCoeffs, constraints);
+
             // Display results
-            displayResults(objectiveCoeffs, constraints);
+            displayResults(objectiveCoeffs, constraints, solution);
         }
 
-        function displayResults(objectiveCoeffs, constraints) {
+        function displayResults(objectiveCoeffs, constraints, solution) {
             const resultsContent = document.getElementById('resultsContent');
             const variables = ['x', 'y', 'z', 'w', 'v', 'u', 't', 's', 'r', 'q'];
             
@@ -532,7 +535,7 @@
             resultHTML += '<p><strong>Objective Function:</strong></p>';
             let objText = problemType === 'max' ? 'Maximize Z = ' : 'Minimize Z = ';
             for (let i = 0; i < objectiveCoeffs.length; i++) {
-                if (objectiveCoeffs[i] !== 0) {
+                if (objectiveCoeffs[i] !== 0 || i === 0) {
                     if (i > 0 && objectiveCoeffs[i] > 0) objText += ' + ';
                     if (objectiveCoeffs[i] < 0) objText += ' - ';
                     if (Math.abs(objectiveCoeffs[i]) !== 1) {
@@ -547,10 +550,12 @@
             resultHTML += '<p style="margin-top: 20px;"><strong>Constraints:</strong></p><pre>';
             for (let i = 0; i < constraints.length; i++) {
                 let constraintText = '';
+                let hasNonZero = false;
                 for (let j = 0; j < constraints[i].coefficients.length; j++) {
                     const coeff = constraints[i].coefficients[j];
                     if (coeff !== 0) {
-                        if (j > 0 && coeff > 0) constraintText += ' + ';
+                        hasNonZero = true;
+                        if (constraintText && coeff > 0) constraintText += ' + ';
                         if (coeff < 0) constraintText += ' - ';
                         if (Math.abs(coeff) !== 1) {
                             constraintText += Math.abs(coeff);
@@ -558,6 +563,7 @@
                         constraintText += variables[j] || `x${j + 1}`;
                     }
                 }
+                if (!hasNonZero) constraintText = '0';
                 
                 let opSymbol = '';
                 if (constraints[i].operator === '<=') opSymbol = ' ≤ ';
@@ -569,13 +575,351 @@
             }
             resultHTML += '</pre>';
 
-            resultHTML += '<p style="margin-top: 20px; color: #ff4d94;"><strong>Note:</strong> This is the first phase of the solution. The complete Simplex algorithm will be added later to calculate the optimal solution.</p>';
+            // Display solution
+            resultHTML += '<div style="margin-top: 30px; padding: 20px; background: #fff5f9; border-radius: 10px; border: 2px solid #ff4d94;">';
+            resultHTML += '<h3 style="color: #ff4d94; margin-bottom: 15px;">Optimal Solution:</h3>';
+            
+            if (solution.status === 'optimal') {
+                resultHTML += '<p style="color: #28a745; font-weight: 600; margin-bottom: 15px;">✓ Solution Found!</p>';
+                
+                // Display variable values
+                resultHTML += '<p><strong>Variable Values:</strong></p><pre style="background: white; padding: 15px; border-radius: 8px;">';
+                for (let i = 0; i < numVariables; i++) {
+                    const varName = variables[i] || `x${i + 1}`;
+                    const value = solution.variables[i] !== undefined ? solution.variables[i] : 0;
+                    resultHTML += `${varName} = ${value.toFixed(4)}\n`;
+                }
+                resultHTML += '</pre>';
+                
+                // Display optimal value
+                resultHTML += `<p style="margin-top: 15px;"><strong>Optimal Value:</strong></p>`;
+                resultHTML += `<p style="font-size: 1.2rem; color: #ff4d94; font-weight: 600;">Z = ${solution.value.toFixed(4)}</p>`;
+            } else if (solution.status === 'unbounded') {
+                resultHTML += '<p style="color: #dc3545; font-weight: 600;">⚠ The problem is unbounded (no optimal solution exists).</p>';
+            } else if (solution.status === 'infeasible') {
+                resultHTML += '<p style="color: #dc3545; font-weight: 600;">⚠ The problem is infeasible (no solution exists).</p>';
+            } else {
+                resultHTML += '<p style="color: #ffc107; font-weight: 600;">⚠ Could not solve the problem. Please check your inputs.</p>';
+            }
+            
+            resultHTML += '</div>';
 
             resultsContent.innerHTML = resultHTML;
             document.getElementById('resultsCard').classList.add('show');
             
             // Scroll to results
             document.getElementById('resultsCard').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+
+        // Simplex Algorithm Implementation
+        function simplexSolve(objectiveCoeffs, constraints) {
+            const numVars = objectiveCoeffs.length;
+            const numConstraints = constraints.length;
+            
+            // Convert to standard form for maximization
+            // Simplex algorithm maximizes, so for minimization we maximize -Z
+            const isMaximize = problemType === 'max';
+            const objCoeffs = objectiveCoeffs.map(c => -c); // Negate because simplex maximizes
+            
+            // Count slack/surplus/artificial variables needed
+            let slackCount = 0;
+            let surplusCount = 0;
+            let artificialCount = 0;
+            const constraintTypes = [];
+            
+            for (let i = 0; i < numConstraints; i++) {
+                if (constraints[i].operator === '<=') {
+                    constraintTypes.push('slack');
+                    slackCount++;
+                } else if (constraints[i].operator === '>=') {
+                    constraintTypes.push('surplus');
+                    surplusCount++;
+                    artificialCount++;
+                } else { // '='
+                    constraintTypes.push('equality');
+                    artificialCount++;
+                }
+            }
+            
+            // Build the tableau
+            const totalVars = numVars + slackCount + surplusCount + artificialCount;
+            const tableau = [];
+            
+            // Initialize tableau with zeros
+            for (let i = 0; i <= numConstraints; i++) {
+                tableau.push(new Array(totalVars + 1).fill(0));
+            }
+            
+            // Set objective row (last row)
+            for (let i = 0; i < numVars; i++) {
+                tableau[numConstraints][i] = objCoeffs[i];
+            }
+            
+            // Fill constraints
+            let slackIdx = numVars;
+            let surplusIdx = numVars + slackCount;
+            let artificialIdx = numVars + slackCount + surplusCount;
+            
+            for (let i = 0; i < numConstraints; i++) {
+                // Copy constraint coefficients
+                for (let j = 0; j < numVars; j++) {
+                    tableau[i][j] = constraints[i].coefficients[j];
+                }
+                
+                // Add slack/surplus/artificial variables
+                if (constraintTypes[i] === 'slack') {
+                    tableau[i][slackIdx] = 1;
+                    slackIdx++;
+                } else if (constraintTypes[i] === 'surplus') {
+                    tableau[i][surplusIdx] = -1;
+                    tableau[i][artificialIdx] = 1;
+                    surplusIdx++;
+                    artificialIdx++;
+                } else { // equality
+                    tableau[i][artificialIdx] = 1;
+                    artificialIdx++;
+                }
+                
+                // Set RHS
+                tableau[i][totalVars] = constraints[i].rhs;
+            }
+            
+            // If we have artificial variables, use two-phase method
+            if (artificialCount > 0) {
+                return twoPhaseSimplex(tableau, numVars, numConstraints, totalVars, artificialIdx, isMaximize);
+            } else {
+                return standardSimplex(tableau, numVars, numConstraints, totalVars, isMaximize);
+            }
+        }
+        
+        function standardSimplex(tableau, numVars, numConstraints, totalVars, isMaximize) {
+            const maxIterations = 100;
+            let iteration = 0;
+            
+            while (iteration < maxIterations) {
+                // Check if optimal (all coefficients in objective row >= 0)
+                let isOptimal = true;
+                let pivotCol = -1;
+                
+                for (let j = 0; j < totalVars; j++) {
+                    if (tableau[numConstraints][j] < -1e-10) {
+                        isOptimal = false;
+                        if (pivotCol === -1 || tableau[numConstraints][j] < tableau[numConstraints][pivotCol]) {
+                            pivotCol = j;
+                        }
+                    }
+                }
+                
+                if (isOptimal) break;
+                
+                // Find pivot row
+                let pivotRow = -1;
+                let minRatio = Infinity;
+                
+                for (let i = 0; i < numConstraints; i++) {
+                    if (tableau[i][pivotCol] > 1e-10) {
+                        const ratio = tableau[i][totalVars] / tableau[i][pivotCol];
+                        if (ratio >= 0 && ratio < minRatio) {
+                            minRatio = ratio;
+                            pivotRow = i;
+                        }
+                    }
+                }
+                
+                if (pivotRow === -1) {
+                    return { status: 'unbounded', value: 0, variables: [] };
+                }
+                
+                // Perform pivot
+                pivot(tableau, pivotRow, pivotCol, numConstraints + 1, totalVars + 1);
+                iteration++;
+            }
+            
+            // Extract solution
+            const solution = extractSolution(tableau, numVars, numConstraints, totalVars);
+            // Since we negated coefficients, the value in tableau is -Z, so we negate it back
+            const optimalValue = -tableau[numConstraints][totalVars];
+            
+            return {
+                status: 'optimal',
+                value: optimalValue,
+                variables: solution
+            };
+        }
+        
+        function twoPhaseSimplex(tableau, numVars, numConstraints, totalVars, artificialStart, isMaximize) {
+            // Phase 1: Minimize sum of artificial variables
+            const phase1Tableau = tableau.map(row => [...row]);
+            
+            // Create phase 1 objective (minimize artificial variables)
+            const phase1Obj = new Array(totalVars + 1).fill(0);
+            for (let j = artificialStart - (totalVars - artificialStart); j < artificialStart; j++) {
+                if (j >= 0) {
+                    for (let i = 0; i < numConstraints; i++) {
+                        phase1Obj[j] -= phase1Tableau[i][j];
+                    }
+                }
+            }
+            
+            // Find artificial variables and set up phase 1 objective
+            for (let j = numVars; j < totalVars; j++) {
+                let isArtificial = false;
+                for (let i = 0; i < numConstraints; i++) {
+                    if (Math.abs(phase1Tableau[i][j] - 1) < 1e-10 && phase1Tableau[i][totalVars] !== 0) {
+                        isArtificial = true;
+                        break;
+                    }
+                }
+                if (isArtificial) {
+                    for (let i = 0; i < numConstraints; i++) {
+                        phase1Obj[j] -= phase1Tableau[i][j];
+                    }
+                }
+            }
+            
+            phase1Tableau[numConstraints] = phase1Obj;
+            
+            // Solve phase 1
+            const maxIterations = 100;
+            let iteration = 0;
+            
+            while (iteration < maxIterations) {
+                let isOptimal = true;
+                let pivotCol = -1;
+                
+                for (let j = 0; j < totalVars; j++) {
+                    if (phase1Tableau[numConstraints][j] < -1e-10) {
+                        isOptimal = false;
+                        if (pivotCol === -1 || phase1Tableau[numConstraints][j] < phase1Tableau[numConstraints][pivotCol]) {
+                            pivotCol = j;
+                        }
+                    }
+                }
+                
+                if (isOptimal) break;
+                
+                let pivotRow = -1;
+                let minRatio = Infinity;
+                
+                for (let i = 0; i < numConstraints; i++) {
+                    if (phase1Tableau[i][pivotCol] > 1e-10) {
+                        const ratio = phase1Tableau[i][totalVars] / phase1Tableau[i][pivotCol];
+                        if (ratio >= 0 && ratio < minRatio) {
+                            minRatio = ratio;
+                            pivotRow = i;
+                        }
+                    }
+                }
+                
+                if (pivotRow === -1) {
+                    return { status: 'unbounded', value: 0, variables: [] };
+                }
+                
+                pivot(phase1Tableau, pivotRow, pivotCol, numConstraints + 1, totalVars + 1);
+                iteration++;
+            }
+            
+            // Check if phase 1 optimal value is 0 (feasible)
+            if (Math.abs(phase1Tableau[numConstraints][totalVars]) > 1e-10) {
+                return { status: 'infeasible', value: 0, variables: [] };
+            }
+            
+            // Phase 2: Use original objective
+            const phase2Tableau = phase1Tableau.map(row => [...row]);
+            
+            // Restore original objective
+            for (let j = 0; j < numVars; j++) {
+                phase2Tableau[numConstraints][j] = tableau[numConstraints][j];
+            }
+            phase2Tableau[numConstraints][totalVars] = tableau[numConstraints][totalVars];
+            
+            // Zero out artificial variables in objective
+            for (let j = numVars; j < totalVars; j++) {
+                phase2Tableau[numConstraints][j] = 0;
+            }
+            
+            // Make basic variables have zero coefficients in objective
+            for (let i = 0; i < numConstraints; i++) {
+                let basicCol = -1;
+                for (let j = 0; j < totalVars; j++) {
+                    if (Math.abs(phase2Tableau[i][j] - 1) < 1e-10) {
+                        let isBasic = true;
+                        for (let k = 0; k < numConstraints; k++) {
+                            if (k !== i && Math.abs(phase2Tableau[k][j]) > 1e-10) {
+                                isBasic = false;
+                                break;
+                            }
+                        }
+                        if (isBasic) {
+                            basicCol = j;
+                            break;
+                        }
+                    }
+                }
+                
+                if (basicCol >= 0 && basicCol < numVars) {
+                    const coeff = phase2Tableau[numConstraints][basicCol];
+                    if (Math.abs(coeff) > 1e-10) {
+                        for (let j = 0; j <= totalVars; j++) {
+                            phase2Tableau[numConstraints][j] -= coeff * phase2Tableau[i][j];
+                        }
+                    }
+                }
+            }
+            
+            // Solve phase 2
+            return standardSimplex(phase2Tableau, numVars, numConstraints, totalVars, isMaximize);
+        }
+        
+        function pivot(tableau, pivotRow, pivotCol, numRows, numCols) {
+            const pivotElement = tableau[pivotRow][pivotCol];
+            
+            // Normalize pivot row
+            for (let j = 0; j < numCols; j++) {
+                tableau[pivotRow][j] /= pivotElement;
+            }
+            
+            // Eliminate pivot column
+            for (let i = 0; i < numRows; i++) {
+                if (i !== pivotRow) {
+                    const factor = tableau[i][pivotCol];
+                    for (let j = 0; j < numCols; j++) {
+                        tableau[i][j] -= factor * tableau[pivotRow][j];
+                    }
+                }
+            }
+        }
+        
+        function extractSolution(tableau, numVars, numConstraints, totalVars) {
+            const solution = new Array(numVars).fill(0);
+            
+            for (let j = 0; j < numVars; j++) {
+                let basicRow = -1;
+                let isBasic = false;
+                
+                for (let i = 0; i < numConstraints; i++) {
+                    if (Math.abs(tableau[i][j] - 1) < 1e-10) {
+                        let isOnlyOne = true;
+                        for (let k = 0; k < numConstraints; k++) {
+                            if (k !== i && Math.abs(tableau[k][j]) > 1e-10) {
+                                isOnlyOne = false;
+                                break;
+                            }
+                        }
+                        if (isOnlyOne) {
+                            basicRow = i;
+                            isBasic = true;
+                            break;
+                        }
+                    }
+                }
+                
+                if (isBasic && basicRow >= 0) {
+                    solution[j] = tableau[basicRow][totalVars];
+                }
+            }
+            
+            return solution;
         }
 
         function resetForm() {
